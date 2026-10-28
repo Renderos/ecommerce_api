@@ -1,0 +1,1864 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "API E-commerce Segura",
+        "description": "API RESTful de e-commerce construida con Laravel 12.\n\n**Flujo completo:** registro → login (token Bearer) → catálogo → crear orden → pagar con Stripe → historial.\n\n**Autenticación:** Laravel Sanctum. Obtén un token en `POST /api/auth/login` y presiona **Authorize** con el valor del token (sin el prefijo `Bearer`).\n\n**Errores:** todas las respuestas de error usan el esquema `ErrorResponse`.",
+        "contact": {
+            "name": "Equipo Backend",
+            "email": "backend@ecommerce.test"
+        },
+        "license": {
+            "name": "MIT"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000",
+            "description": "Servidor de la API"
+        }
+    ],
+    "paths": {
+        "/api/auth/register": {
+            "post": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Registrar un nuevo cliente",
+                "description": "Crea una cuenta con rol \"customer\" y devuelve un token de acceso. Limitado a 5 intentos por minuto.",
+                "operationId": "authRegister",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Cliente registrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Iniciar sesión",
+                "description": "Valida credenciales y emite un token Bearer de Sanctum. Limitado a 5 intentos por minuto por email/IP.",
+                "operationId": "authLogin",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login exitoso",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Credenciales inválidas",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationErrorResponse"
+                                },
+                                "example": {
+                                    "success": false,
+                                    "message": "Los datos enviados no son válidos.",
+                                    "error_code": "VALIDATION_ERROR",
+                                    "errors": {
+                                        "email": [
+                                            "Las credenciales proporcionadas son incorrectas."
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/auth/me": {
+            "get": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Perfil del usuario autenticado",
+                "operationId": "authMe",
+                "responses": {
+                    "200": {
+                        "description": "Datos del usuario",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/auth/logout": {
+            "post": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Cerrar sesión (revoca el token actual)",
+                "operationId": "authLogout",
+                "responses": {
+                    "200": {
+                        "description": "Sesión cerrada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Sesión cerrada correctamente."
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "example": null,
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/auth/logout-all": {
+            "post": {
+                "tags": [
+                    "Autenticación"
+                ],
+                "summary": "Cerrar sesión en todos los dispositivos (revoca todos los tokens)",
+                "operationId": "authLogoutAll",
+                "responses": {
+                    "200": {
+                        "description": "Todos los tokens revocados"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/orders": {
+            "get": {
+                "tags": [
+                    "Órdenes"
+                ],
+                "summary": "Historial de compras del usuario autenticado",
+                "operationId": "ordersIndex",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "paid",
+                                "failed",
+                                "cancelled"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "maximum": 50,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Órdenes del usuario, más recientes primero",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Order"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Órdenes"
+                ],
+                "summary": "Crear una orden de compra",
+                "description": "Los precios se toman del catálogo (no del cliente). Se valida y reserva el stock. La orden queda en estado \"pending\" hasta que se pague.",
+                "operationId": "ordersStore",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Orden creada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "422": {
+                        "description": "Error de validación o stock insuficiente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{id}": {
+            "get": {
+                "tags": [
+                    "Órdenes"
+                ],
+                "summary": "Detalle de una orden",
+                "operationId": "ordersShow",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Orden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{id}/cancel": {
+            "post": {
+                "tags": [
+                    "Órdenes"
+                ],
+                "summary": "Cancelar una orden no pagada",
+                "description": "Devuelve el stock reservado y cancela en Stripe los PaymentIntent abiertos.",
+                "operationId": "ordersCancel",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Orden cancelada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/BusinessError"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/orders/{id}/pay": {
+            "post": {
+                "tags": [
+                    "Pagos"
+                ],
+                "summary": "Pagar una orden con Stripe",
+                "description": "Crea un PaymentIntent en Stripe por el total de la orden.\n\n- **Con `payment_method`** (ej. `pm_card_visa` en modo test): el pago se confirma en el servidor y la orden pasa a `paid` si Stripe lo aprueba.\n- **Sin `payment_method`**: se devuelve `client_secret` para confirmar el pago desde el frontend con Stripe.js (`stripe.confirmCardPayment`). El estado final llega vía webhook o consultando `GET /api/payments/{id}`.\n\nLimitado a 10 solicitudes por minuto.",
+                "operationId": "ordersPay",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID de la orden",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PayOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "PaymentIntent creado / pago procesado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pago realizado con éxito."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "payment": {
+                                                    "$ref": "#/components/schemas/Payment"
+                                                },
+                                                "order": {
+                                                    "$ref": "#/components/schemas/Order"
+                                                },
+                                                "client_secret": {
+                                                    "type": "string",
+                                                    "example": "pi_3Q..._secret_...",
+                                                    "nullable": true
+                                                },
+                                                "publishable_key": {
+                                                    "type": "string",
+                                                    "example": "pk_test_...",
+                                                    "nullable": true
+                                                },
+                                                "requires_action": {
+                                                    "description": "true si el banco exige autenticación 3D Secure en el frontend",
+                                                    "type": "boolean",
+                                                    "example": false
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "402": {
+                        "description": "Tarjeta rechazada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "success": false,
+                                    "message": "El pago fue rechazado: Your card was declined.",
+                                    "error_code": "CARD_DECLINED",
+                                    "errors": {
+                                        "decline_code": [
+                                            "generic_decline"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "409": {
+                        "description": "La orden no está en un estado pagable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    },
+                    "502": {
+                        "description": "Error de comunicación con Stripe",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/payments": {
+            "get": {
+                "tags": [
+                    "Pagos"
+                ],
+                "summary": "Historial de pagos del usuario autenticado",
+                "operationId": "paymentsIndex",
+                "responses": {
+                    "200": {
+                        "description": "Pagos del usuario",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Payment"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/payments/{id}": {
+            "get": {
+                "tags": [
+                    "Pagos"
+                ],
+                "summary": "Consultar un pago (sincroniza el estado con Stripe)",
+                "description": "Consulta el PaymentIntent en Stripe y actualiza el estado local del pago y de la orden. Útil tras confirmar el pago en el frontend.",
+                "operationId": "paymentsShow",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pago",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/Payment"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "502": {
+                        "description": "Error de comunicación con Stripe",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/products": {
+            "get": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Listado público de productos",
+                "description": "Devuelve los productos activos, paginados, con filtros de búsqueda, categoría, precio y stock.",
+                "operationId": "productsIndex",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Busca en nombre, descripción y SKU",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Electrónica"
+                        }
+                    },
+                    {
+                        "name": "min_price",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "max_price",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "in_stock",
+                        "in": "query",
+                        "description": "Solo productos con stock disponible",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Prefijo \"-\" para orden descendente",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "name",
+                                "-name",
+                                "price",
+                                "-price",
+                                "created_at",
+                                "-created_at"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Listado paginado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Product"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Crear producto (solo admin)",
+                "operationId": "productsStore",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StoreProductRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Producto creado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/products/{id}": {
+            "get": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Detalle de un producto",
+                "operationId": "productsShow",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Producto encontrado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Actualizar producto (solo admin)",
+                "description": "Acepta PUT o PATCH. Solo se modifican los campos enviados.",
+                "operationId": "productsUpdate",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateProductRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Producto actualizado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProductResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Productos"
+                ],
+                "summary": "Eliminar producto (solo admin)",
+                "description": "Eliminación lógica (soft delete): el producto deja de mostrarse pero se conserva para el historial de órdenes. No se permite si tiene órdenes pendientes de pago.",
+                "operationId": "productsDestroy",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Producto eliminado",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Producto eliminado correctamente."
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "example": null,
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthenticated"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/BusinessError"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/stripe/webhook": {
+            "post": {
+                "tags": [
+                    "Webhooks"
+                ],
+                "summary": "Webhook de Stripe",
+                "description": "Endpoint que recibe eventos de Stripe (payment_intent.succeeded, payment_intent.payment_failed, payment_intent.canceled, etc.). La autenticidad se verifica con la cabecera `Stripe-Signature` y `STRIPE_WEBHOOK_SECRET`. No está pensado para ser invocado manualmente.",
+                "operationId": "stripeWebhook",
+                "parameters": [
+                    {
+                        "name": "Stripe-Signature",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "description": "Evento de Stripe",
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Evento recibido",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Evento procesado."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string",
+                                                    "example": "payment_intent.succeeded"
+                                                },
+                                                "handled": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Firma inválida",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AuthResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Inicio de sesión exitoso."
+                    },
+                    "data": {
+                        "properties": {
+                            "user": {
+                                "$ref": "#/components/schemas/User"
+                            },
+                            "token": {
+                                "type": "string",
+                                "example": "1|Xz8k2..."
+                            },
+                            "token_type": {
+                                "type": "string",
+                                "example": "Bearer"
+                            },
+                            "expires_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "OrderResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "OK"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/Order"
+                    }
+                },
+                "type": "object"
+            },
+            "ProductResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "OK"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/Product"
+                    }
+                },
+                "type": "object"
+            },
+            "LoginRequest": {
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "cliente@ecommerce.test"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "example": "Cliente123!"
+                    },
+                    "device_name": {
+                        "description": "Nombre del dispositivo para identificar el token.",
+                        "type": "string",
+                        "example": "swagger-ui",
+                        "nullable": true,
+                        "maxLength": 100
+                    }
+                },
+                "type": "object"
+            },
+            "RegisterRequest": {
+                "required": [
+                    "name",
+                    "email",
+                    "password",
+                    "password_confirmation"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Juana Pérez",
+                        "maxLength": 100
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "juana@example.com"
+                    },
+                    "password": {
+                        "description": "Mínimo 8 caracteres, con mayúsculas, minúsculas, números y símbolos.",
+                        "type": "string",
+                        "format": "password",
+                        "example": "Secreta123!",
+                        "minLength": 8
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "format": "password",
+                        "example": "Secreta123!"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+56 9 8765 4321",
+                        "nullable": true,
+                        "maxLength": 30
+                    }
+                },
+                "type": "object"
+            },
+            "PayOrderRequest": {
+                "properties": {
+                    "payment_method": {
+                        "description": "ID de PaymentMethod de Stripe. Si se envía, el pago se confirma en el servidor. En modo test puedes usar 'pm_card_visa' (aprobado), 'pm_card_chargeDeclined' (rechazado) o 'pm_card_authenticationRequired' (requiere 3DS). Si se omite, se devuelve el client_secret para confirmarlo desde el frontend con Stripe.js.",
+                        "type": "string",
+                        "example": "pm_card_visa",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "StoreOrderRequest": {
+                "required": [
+                    "items"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "product_id",
+                                "quantity"
+                            ],
+                            "properties": {
+                                "product_id": {
+                                    "type": "integer",
+                                    "example": 1
+                                },
+                                "quantity": {
+                                    "type": "integer",
+                                    "example": 2,
+                                    "maximum": 50,
+                                    "minimum": 1
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "minItems": 1
+                    },
+                    "shipping_address": {
+                        "type": "string",
+                        "example": "Av. Siempre Viva 742, Santiago",
+                        "nullable": true,
+                        "maxLength": 255
+                    },
+                    "notes": {
+                        "type": "string",
+                        "example": "Entregar en conserjería",
+                        "nullable": true,
+                        "maxLength": 500
+                    }
+                },
+                "type": "object"
+            },
+            "StoreProductRequest": {
+                "required": [
+                    "sku",
+                    "name",
+                    "price",
+                    "stock"
+                ],
+                "properties": {
+                    "sku": {
+                        "type": "string",
+                        "example": "ELEC-010",
+                        "maxLength": 50
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Parlante Portátil",
+                        "maxLength": 150
+                    },
+                    "description": {
+                        "type": "string",
+                        "example": "Parlante resistente al agua con 12h de batería.",
+                        "nullable": true
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 59.9,
+                        "minimum": 0.5
+                    },
+                    "stock": {
+                        "type": "integer",
+                        "example": 25,
+                        "minimum": 0
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "Electrónica",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://placehold.co/600x400",
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "UpdateProductRequest": {
+                "description": "Todos los campos son opcionales; solo se actualizan los enviados.",
+                "properties": {
+                    "sku": {
+                        "type": "string",
+                        "example": "ELEC-010",
+                        "maxLength": 50
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Parlante Portátil v2",
+                        "maxLength": 150
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 54.9,
+                        "minimum": 0.5
+                    },
+                    "stock": {
+                        "type": "integer",
+                        "example": 40,
+                        "minimum": 0
+                    },
+                    "category": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "OrderItem": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "product_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "product_name": {
+                        "type": "string",
+                        "example": "Audífonos Bluetooth Pro"
+                    },
+                    "unit_price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 79.9
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "subtotal": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 159.8
+                    }
+                },
+                "type": "object"
+            },
+            "Order": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "order_number": {
+                        "type": "string",
+                        "example": "ORD-20261028-8KX2QZ"
+                    },
+                    "status": {
+                        "type": "string",
+                        "example": "pending",
+                        "enum": [
+                            "pending",
+                            "paid",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "subtotal": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 159.8
+                    },
+                    "tax": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 30.36
+                    },
+                    "total": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 190.16
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "usd"
+                    },
+                    "shipping_address": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "items_count": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/OrderItem"
+                        }
+                    },
+                    "latest_payment": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/Payment"
+                            },
+                            {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                    null
+                                ]
+                            }
+                        ]
+                    },
+                    "paid_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Payment": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "order_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "provider": {
+                        "type": "string",
+                        "example": "stripe"
+                    },
+                    "stripe_payment_intent_id": {
+                        "type": "string",
+                        "example": "pi_3Q..."
+                    },
+                    "amount": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 190.16
+                    },
+                    "currency": {
+                        "type": "string",
+                        "example": "usd"
+                    },
+                    "status": {
+                        "description": "Estado del PaymentIntent en Stripe.",
+                        "type": "string",
+                        "example": "succeeded"
+                    },
+                    "payment_method": {
+                        "type": "string",
+                        "example": "pm_1Q...",
+                        "nullable": true
+                    },
+                    "failure_message": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Product": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "sku": {
+                        "type": "string",
+                        "example": "ELEC-001"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Audífonos Bluetooth Pro"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "audifonos-bluetooth-pro"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 79.9
+                    },
+                    "stock": {
+                        "type": "integer",
+                        "example": 50
+                    },
+                    "in_stock": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "Electrónica",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "User": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Cliente Demo"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "cliente@ecommerce.test"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "example": "+56 9 1234 5678",
+                        "nullable": true
+                    },
+                    "role": {
+                        "type": "string",
+                        "example": "customer",
+                        "enum": [
+                            "customer",
+                            "admin"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "ErrorResponse": {
+                "required": [
+                    "success",
+                    "message",
+                    "error_code"
+                ],
+                "properties": {
+                    "success": {
+                        "description": "Definición global de la especificación OpenAPI: info, servidor, seguridad,\ntags y esquemas/respuestas reutilizables.",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Descripción del error."
+                    },
+                    "error_code": {
+                        "type": "string",
+                        "example": "NOT_FOUND"
+                    },
+                    "errors": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationErrorResponse": {
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Los datos enviados no son válidos."
+                    },
+                    "error_code": {
+                        "type": "string",
+                        "example": "VALIDATION_ERROR"
+                    },
+                    "errors": {
+                        "type": "object",
+                        "example": {
+                            "email": [
+                                "El campo email es obligatorio."
+                            ]
+                        },
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "PaginationMeta": {
+                "properties": {
+                    "current_page": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "last_page": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "per_page": {
+                        "type": "integer",
+                        "example": 15
+                    },
+                    "total": {
+                        "type": "integer",
+                        "example": 10
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "responses": {
+            "Unauthenticated": {
+                "description": "No autenticado (token ausente, inválido o expirado)",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        },
+                        "example": {
+                            "success": false,
+                            "message": "No autenticado. Envía un token Bearer válido.",
+                            "error_code": "UNAUTHENTICATED"
+                        }
+                    }
+                }
+            },
+            "Forbidden": {
+                "description": "Sin permisos para la acción",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        },
+                        "example": {
+                            "success": false,
+                            "message": "No tienes permisos para realizar esta acción.",
+                            "error_code": "FORBIDDEN"
+                        }
+                    }
+                }
+            },
+            "NotFound": {
+                "description": "Recurso no encontrado",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        },
+                        "example": {
+                            "success": false,
+                            "message": "Producto no encontrado.",
+                            "error_code": "NOT_FOUND"
+                        }
+                    }
+                }
+            },
+            "ValidationError": {
+                "description": "Error de validación",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ValidationErrorResponse"
+                        }
+                    }
+                }
+            },
+            "BusinessError": {
+                "description": "Violación de regla de negocio",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        },
+                        "example": {
+                            "success": false,
+                            "message": "Stock insuficiente para uno o más productos.",
+                            "error_code": "BUSINESS_RULE_VIOLATION",
+                            "errors": {
+                                "items.0.quantity": [
+                                    "Solo quedan 3 unidades de Mouse Inalámbrico."
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            "TooManyRequests": {
+                "description": "Límite de solicitudes excedido",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ErrorResponse"
+                        },
+                        "example": {
+                            "success": false,
+                            "message": "Demasiadas solicitudes. Intenta nuevamente más tarde.",
+                            "error_code": "TOO_MANY_REQUESTS"
+                        }
+                    }
+                }
+            }
+        },
+        "securitySchemes": {
+            "sanctum": {
+                "type": "http",
+                "description": "Token personal de Laravel Sanctum obtenido en /api/auth/login o /api/auth/register.",
+                "bearerFormat": "Token",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Autenticación",
+            "description": "Registro, login y gestión de sesión del cliente"
+        },
+        {
+            "name": "Productos",
+            "description": "Catálogo público y administración de productos"
+        },
+        {
+            "name": "Órdenes",
+            "description": "Creación de órdenes e historial de compras"
+        },
+        {
+            "name": "Pagos",
+            "description": "Procesamiento de pagos con Stripe"
+        },
+        {
+            "name": "Webhooks",
+            "description": "Eventos enviados por Stripe"
+        }
+    ]
+}
