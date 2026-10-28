@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\ApiExceptionRenderer;
+use App\Exceptions\BusinessException;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -26,6 +27,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson()
         );
+
+        // Las reglas de negocio son respuestas esperadas (409/422), no errores del servidor
+        $exceptions->dontReport(BusinessException::class);
 
         $exceptions->render(new ApiExceptionRenderer);
     })->create();

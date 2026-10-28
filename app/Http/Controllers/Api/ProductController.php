@@ -55,9 +55,10 @@ class ProductController extends ApiController
         $query = Product::query()->active()
             ->when($filters['search'] ?? null, function ($q, $search) {
                 $q->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('sku', 'like', "%{$search}%");
+                    // whereLike sin distinguir mayúsculas: usa ILIKE en PostgreSQL y LIKE en MySQL/SQLite
+                    $q->whereLike('name', "%{$search}%")
+                        ->orWhereLike('description', "%{$search}%")
+                        ->orWhereLike('sku', "%{$search}%");
                 });
             })
             ->when($filters['category'] ?? null, fn ($q, $category) => $q->where('category', $category))

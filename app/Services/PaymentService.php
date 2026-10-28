@@ -51,7 +51,9 @@ class PaymentService
 
         // La clave de idempotencia evita cobros duplicados si el cliente reintenta la petición
         $attempt = $order->payments()->count() + 1;
-        $idempotencyKey = "order-{$order->id}-attempt-{$attempt}-".md5((string) $paymentMethod);
+        // Se usa order_number (aleatorio) y no el id: varios entornos (local, producción) comparten la
+        // misma cuenta de Stripe y sus ids se repiten, lo que provocaría IdempotencyException
+        $idempotencyKey = "{$order->order_number}-attempt-{$attempt}-".md5((string) $paymentMethod);
 
         try {
             $intent = $this->gateway->createPaymentIntent($params, $idempotencyKey);
