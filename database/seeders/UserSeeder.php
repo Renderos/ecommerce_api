@@ -8,25 +8,27 @@ use Illuminate\Database\Seeder;
 class UserSeeder extends Seeder
 {
     /**
-     * Usuarios de prueba. Las contraseñas se toman del .env para no dejarlas fijas en el código.
+     * Usuarios de prueba. Las credenciales se configuran con las variables SEED_* del .env.
      */
     public function run(): void
     {
+        $seed = config('services.seed');
+
         $admin = User::updateOrCreate(
-            ['email' => env('SEED_ADMIN_EMAIL', 'admin@ecommerce.test')],
+            ['email' => $seed['admin_email']],
             [
                 'name' => 'Administrador',
-                'password' => env('SEED_ADMIN_PASSWORD', 'Admin123!'),
+                'password' => $seed['admin_password'],
                 'email_verified_at' => now(),
             ]
         );
         $admin->forceFill(['role' => User::ROLE_ADMIN])->save();
 
         User::updateOrCreate(
-            ['email' => env('SEED_CUSTOMER_EMAIL', 'cliente@ecommerce.test')],
+            ['email' => $seed['customer_email']],
             [
                 'name' => 'Cliente Demo',
-                'password' => env('SEED_CUSTOMER_PASSWORD', 'Cliente123!'),
+                'password' => $seed['customer_password'],
                 'phone' => '+56 9 1234 5678',
                 'email_verified_at' => now(),
             ]

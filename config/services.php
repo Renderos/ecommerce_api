@@ -47,4 +47,12 @@ return [
         'tax_rate' => (float) env('SHOP_TAX_RATE', 0.19),
     ],
 
+    // Usuarios demo creados por UserSeeder (leídos vía config para funcionar con config:cache)
+    'seed' => [
+        'admin_email' => env('SEED_ADMIN_EMAIL', 'admin@ecommerce.test'),
+        'admin_password' => env('SEED_ADMIN_PASSWORD', 'Admin123!'),
+        'customer_email' => env('SEED_CUSTOMER_EMAIL', 'cliente@ecommerce.test'),
+        'customer_password' => env('SEED_CUSTOMER_PASSWORD', 'Cliente123!'),
+    ],
+
 ];
